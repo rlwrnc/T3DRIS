@@ -3,12 +3,17 @@
 
 GameMemory win32_memory_game_allocate(size_t size_permanent, size_t size_transient)
 {
+#if TED_RELEASE == 1
+	LPVOID base_address = 0;
+#else
+	LPVOID base_address = (LPVOID) terabytes(3);
+#endif
 	GameMemory new_memory = {0};
 	new_memory.size_permanent = size_permanent;
 	new_memory.size_transient = size_transient;
 	new_memory.size_total = size_permanent + size_transient;
 	new_memory.permanent = VirtualAlloc(
-			0,
+			base_address,
 			new_memory.size_total,
 			MEM_RESERVE | MEM_COMMIT,
 			PAGE_READWRITE);

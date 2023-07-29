@@ -11,6 +11,7 @@ typedef struct {
 #define kilobytes(value) ((value) * 1024LL)
 #define megabytes(value) (kilobytes(value) * 1024LL)
 #define gigabytes(value) (megabytes(value) * 1024LL)
+#define terabytes(value) (gigabytes(value) * 1024LL)
 
 #ifdef _WIN32
 #include "win32_memory.c"
