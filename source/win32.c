@@ -2,26 +2,54 @@
 #include "t3dris.h"
 
 #if TED_RELEASE == 0
-game_initialize_func *game_initialize = 0;
-game_update_and_render_func *game_update_and_render = 0;
+typedef struct {
+	bool is_valid;
+	HMODULE handle;
+	FILETIME write_time;
+	game_initialize_func *initialize;
+	game_update_and_render_func *update_and_render;
+} GameCode;
 
-void *platform_load_game_code()
+inline FILETIME platform_get_write_time(const char *filename)
 {
-	CopyFile("game.dll", "game_temp.dll", false);
-	HMODULE library = LoadLibraryA("game_temp.dll");
-	assert(library);
+	FILETIME write_time = {0};
+	WIN32_FIND_DATA find_data;
+	HANDLE find_handle = FindFirstFileA(filename, &find_data);
+	
+	if (find_handle == INVALID_HANDLE_VALUE) {
+		// TODO: log this
+		return write_time;
+	}
 
-	game_initialize = (game_initialize_func *) GetProcAddress(library, "game_initialize");
-	game_update_and_render = (game_update_and_render_func *) GetProcAddress(library, "game_update_and_render");
-	return library;
+	write_time = find_data.ftLastWriteTime;
+	FindClose(find_handle);
+	return write_time;
 }
 
-void platform_unload_game_code(void *code_handle)
+GameCode platform_load_game_code(
+		const char *source_library_name,
+		const char *temp_library_name)
 {
-	FreeLibrary(code_handle);
-	code_handle = 0;
-	game_initialize = 0;
-	game_update_and_render = 0;
+	GameCode game_code = {0};
+	game_code.write_time = platform_get_write_time(source_library_name);
+	CopyFile(source_library_name, temp_library_name, false);
+	game_code.handle = LoadLibraryA(temp_library_name);
+	assert(game_code.handle);
+
+	game_code.initialize = (game_initialize_func *)
+		GetProcAddress(game_code.handle, "game_initialize");
+	game_code.update_and_render = (game_update_and_render_func *)
+		GetProcAddress(game_code.handle, "game_update_and_render");
+
+	return game_code;
+}
+
+void platform_unload_game_code(GameCode *game_code)
+{
+	FreeLibrary(game_code->handle);
+	game_code->handle = 0;
+	game_code->initialize = 0;
+	game_code->update_and_render = 0;
 }
 #endif
 

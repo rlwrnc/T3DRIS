@@ -18,8 +18,7 @@ void game_initialize(GameMemory *memory)
 
 void game_update_and_render(GameMemory *memory)
 {
-	printf("hello mom!\n");
-#if 0
+#if 1
 	glClearColor(0.4f, 0.6f, 0.0f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT);
 

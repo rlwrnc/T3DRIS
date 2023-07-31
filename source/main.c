@@ -28,17 +28,23 @@ int main()
 			kilobytes(64),
 			megabytes(512));
 	game_memory.glfwGetProcAddress = glfwGetProcAddress;
-	void *game_code_handle = platform_load_game_code();
 
-	game_initialize(&game_memory);
+	GameCode game = platform_load_game_code("game.dll", "game_temp.dll");
+	game.initialize(&game_memory);
 	while (!glfwWindowShouldClose(window)) {
-		platform_unload_game_code(game_code_handle);
-		game_code_handle = platform_load_game_code();
+		FILETIME new_write_time = platform_get_write_time("game.dll");
+		if (CompareFileTime(&new_write_time, &game.write_time) != 0) {
+			platform_unload_game_code(&game);
+			game = platform_load_game_code("game.dll", "game_temp.dll");
+			game.initialize(&game_memory);
+		}
+
 		glfwPollEvents();
-		game_update_and_render(&game_memory);
+		game.update_and_render(&game_memory);
 		glfwSwapBuffers(window);
 	}
 
+	platform_unload_game_code(&game);
 	platform_memory_game_deallocate(&game_memory);
 
 	glfwDestroyWindow(window);
