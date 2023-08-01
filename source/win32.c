@@ -2,54 +2,47 @@
 #include "t3dris.h"
 
 #if TED_RELEASE == 0
-typedef struct {
-	bool is_valid;
-	HMODULE handle;
-	FILETIME write_time;
-	game_initialize_func *initialize;
-	game_update_and_render_func *update_and_render;
-} GameCode;
 
-inline FILETIME platform_get_write_time(const char *filename)
+game_initialize_func *game_initialize = 0;
+game_update_and_render_func *game_update_and_render = 0;
+
+void *platform_hotload_load_game_code(const char *compile_path, const char *load_path)
 {
-	FILETIME write_time = {0};
-	WIN32_FIND_DATA find_data;
-	HANDLE find_handle = FindFirstFileA(filename, &find_data);
-	
-	if (find_handle == INVALID_HANDLE_VALUE) {
-		// TODO: log this
-		return write_time;
-	}
+	CopyFile(compile_path, load_path, false);
+	HMODULE code_handle = LoadLibraryA(load_path);
+	assert(code_handle);
 
-	write_time = find_data.ftLastWriteTime;
-	FindClose(find_handle);
-	return write_time;
+	game_initialize = (game_initialize_func *)
+		GetProcAddress(code_handle, "game_initialize");
+	assert(game_initialize);
+
+	game_update_and_render = (game_update_and_render_func *)
+		GetProcAddress(code_handle, "game_update_and_render");
+	assert(game_update_and_render);
+
+	return code_handle;
 }
 
-GameCode platform_load_game_code(
-		const char *source_library_name,
-		const char *temp_library_name)
+bool platform_hotload_game_has_been_compiled(const char *compile_path, const char *load_path)
 {
-	GameCode game_code = {0};
-	game_code.write_time = platform_get_write_time(source_library_name);
-	CopyFile(source_library_name, temp_library_name, false);
-	game_code.handle = LoadLibraryA(temp_library_name);
-	assert(game_code.handle);
+	FILETIME compile_filetime = {0}, load_filetime = {0};
+	WIN32_FILE_ATTRIBUTE_DATA file_data = {0};
 
-	game_code.initialize = (game_initialize_func *)
-		GetProcAddress(game_code.handle, "game_initialize");
-	game_code.update_and_render = (game_update_and_render_func *)
-		GetProcAddress(game_code.handle, "game_update_and_render");
+	assert(GetFileAttributesExA(compile_path, GetFileExInfoStandard, &file_data));
+	compile_filetime = file_data.ftLastWriteTime;
+	assert(GetFileAttributesExA(load_path, GetFileExInfoStandard, &file_data));
+	load_filetime = file_data.ftLastWriteTime;
 
-	return game_code;
+	int time_difference = CompareFileTime(&compile_filetime, &load_filetime);
+	return (time_difference != 0);
 }
 
-void platform_unload_game_code(GameCode *game_code)
+void platform_hotload_unload_game_code(void *code_handle)
 {
-	FreeLibrary(game_code->handle);
-	game_code->handle = 0;
-	game_code->initialize = 0;
-	game_code->update_and_render = 0;
+	assert(FreeLibrary(code_handle));
+	code_handle = 0;
+	game_initialize = 0;
+	game_update_and_render = 0;
 }
 #endif
 

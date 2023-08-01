@@ -14,6 +14,26 @@ void key_callback(GLFWwindow *window, int key, int scancode, int action, int mod
 		glfwSetWindowShouldClose(window, true);
 }
 
+#if 0
+void *platform_hotload_load_game_code(const char *compilepath, const char *loadpath);
+bool platform_hotload_game_has_been_compiled(const char *compilepath, const char *loadpath);
+bool platform_hotload_unload_game_code(void *code_handle);
+
+void *game_code_handle = platform_hotload_load_game_code("game.dll", "game_load.dll");
+game_initialize();
+while (!glfwWindowShouldClose(window)) {
+	if (platform_hotload_game_has_been_compiled()) {
+		platform_hotload_unload_game_code(game_code_handle);
+		game_code_handle = platform_hotload_load_game_code("game.dll", "game_load.dll");
+		game_initialize();
+	}
+	glfwPollEvents();
+	game_update_and_render();
+	glfwSwapBuffers();
+}
+platform_hotload_unload_game_code(game_code_handle);
+#endif
+
 int main()
 {
 	glfwInit();
@@ -29,22 +49,20 @@ int main()
 			megabytes(512));
 	game_memory.glfwGetProcAddress = glfwGetProcAddress;
 
-	GameCode game = platform_load_game_code("game.dll", "game_temp.dll");
-	game.initialize(&game_memory);
+	void *game_code_handle = platform_hotload_load_game_code("game.dll", "game_load.dll");
+	game_initialize(&game_memory);
 	while (!glfwWindowShouldClose(window)) {
-		FILETIME new_write_time = platform_get_write_time("game.dll");
-		if (CompareFileTime(&new_write_time, &game.write_time) != 0) {
-			platform_unload_game_code(&game);
-			game = platform_load_game_code("game.dll", "game_temp.dll");
-			game.initialize(&game_memory);
+		if (platform_hotload_game_has_been_compiled("game.dll", "game_load.dll")) {
+			platform_hotload_unload_game_code(game_code_handle);
+			game_code_handle = platform_hotload_load_game_code("game.dll", "game_load.dll");
+			game_initialize(&game_memory);
 		}
 
 		glfwPollEvents();
-		game.update_and_render(&game_memory);
+		game_update_and_render(&game_memory);
 		glfwSwapBuffers(window);
 	}
-
-	platform_unload_game_code(&game);
+	platform_hotload_unload_game_code(game_code_handle);
 	platform_memory_game_deallocate(&game_memory);
 
 	glfwDestroyWindow(window);

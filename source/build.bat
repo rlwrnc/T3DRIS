@@ -37,8 +37,9 @@ set dll_exports=/EXPORT:game_update_and_render
 set dll_exports=%dll_exports% /EXPORT:game_initialize
 
 if not exist %out%\ (mkdir %out%)
+if not exist %out%\shaders (mkdir %out%\shaders)
 pushd %out%
-del *.pdb > NUL
+del game*.pdb > NUL
 cl -Od %source%\t3dris.c %compiler_options% /Fmgame.map %defines% /I %EXTERNAL_INCLUDE% %debug_options% /Fogame.obj /LD /link /pdb:game%random%.pdb %linker_options% /out:game.dll %dll_exports%
 cl -Od %source%\main.c %compiler_options% /FmT3DRIS.map %defines% /I %EXTERNAL_INCLUDE% %debug_options% /FoT3DRIS.obj %static_libs% /link %linker_options% /out:T3DRIS.exe
 popd
