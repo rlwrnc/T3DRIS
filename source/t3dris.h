@@ -3,19 +3,18 @@
 /*
     NOTE: The preprocessor flags are defined as follows:
 
-    TED_RELEASE:
-        0 - Internal debug build
-	1 - Release build
+    TED_RELEASE: define to turn off debug nonsense
 */
 
-
+#include <stdio.h>
+#include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <assert.h>
 
-#define GLAD_GL_IMPLEMENTATION
-#include "glad/gl.h"
-#include "glfw/glfw3.h"
+/* #include "glfw/glfw3.h" */
+#include "vmath.h"
+#include "opengl.h"
 
 #define kilobytes(value) ((value) * 1024LL)
 #define megabytes(value) (kilobytes(value) * 1024LL)
@@ -33,15 +32,21 @@ typedef int32_t i32;
 typedef int64_t i64;
 
 typedef struct GameMemory GameMemory;
+typedef struct GameState GameState;
+typedef struct OpenGLState OpenGLState;
 
 #if TED_RELEASE == 0
 typedef void game_initialize_func(GameMemory *memory);
 typedef void game_update_and_render_func(GameMemory *memory);
-typedef GLFWglproc glfwGetProcAddress_func(const char *procname);
 #else
 void game_initialize(GameMemory *);
 void game_update_and_render(GameMemory *);
 #endif
+
+struct GameState {
+	GLuint vbo, vao;
+	GLint model_location, view_location, projection_location;
+};
 
 struct GameMemory {
 	size_t size_permanent;
@@ -49,5 +54,4 @@ struct GameMemory {
 	size_t size_total;
 	void *permanent;
 	void *transient;
-	glfwGetProcAddress_func *glfwGetProcAddress;
 };
