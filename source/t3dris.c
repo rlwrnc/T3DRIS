@@ -118,11 +118,14 @@ void game_initialize(GameMemory *memory)
 
 	program = compile_and_link_shader_program("shaders/vertex.glsl", "shaders/fragment.glsl");
 
-	mat4 translation, scale;
-	mat4_translate(translation, 1.0, 1.0, 0.0);
-	mat4_scale(scale, 1.0, 1.0, 1.0);
+	mat4 translation, rotation, scale;
+	mat4_translate(translation, 0.0, 0.0, 0.0);
+	vec3 rotation_axis = {1.0, 1.0, 0.0};
+	mat4_rotate(rotation, 1.0 / 8.0, rotation_axis);
+	mat4_scale(scale, 2.0, 2.0, 2.0);
 	// translation * scale
 	mat4_multiply(model, model, translation);
+	mat4_multiply(model, model, rotation);
 	mat4_multiply(model, model, scale);
 
 	mat4_translate(view, 0.0, 0.0, -3.0);

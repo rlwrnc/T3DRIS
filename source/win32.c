@@ -93,7 +93,6 @@ static LRESULT CALLBACK window_callback(HWND window, UINT message, WPARAM wparam
 	switch (message) {
 		case WM_CREATE: {
 			HDC current_dc = GetDC(window);
-			win32_initialize_opengl(current_dc);
 			// win_opengl_initialize(current_dc);
 			ReleaseDC(window, current_dc);
 		} break;
@@ -113,6 +112,37 @@ static LRESULT CALLBACK window_callback(HWND window, UINT message, WPARAM wparam
 		} break;
 	}
 	return DefWindowProc(window, message, wparam, lparam);
+}
+
+static void win32_handle_events(Win32State *state, HWND window)
+{
+	MSG message = {0};
+	while (PeekMessage(&message,window, 0, 0, PM_REMOVE)) {
+		switch (message.message) {
+			case WM_QUIT: {
+				state->is_running = false;
+				state->return_code = message.wParam;
+			} break;
+			case WM_SYSKEYDOWN:
+			case WM_SYSKEYUP:
+			case WM_KEYDOWN:
+			case WM_KEYUP: {
+				u32 keycode = (u32) message.wParam;
+				u16 key_flags = HIWORD(message.lParam);
+				bool is_down = (key_flags & KF_UP);
+				bool was_down = !(key_flags & KF_REPEAT);
+
+				if (keycode == VK_ESCAPE) {
+					state->is_running = false;
+					state->return_code = 0;
+				}
+			} break;
+			default: {
+				TranslateMessage(&message);
+				DispatchMessage(&message);
+			} break;
+		}
+	}
 }
 
 static inline void win32_load_wgl_extensions()
@@ -242,6 +272,7 @@ int WINAPI WinMain(HINSTANCE current, HINSTANCE previous, LPSTR command, int sho
 	Win32State win32 = {0};
 	HWND window = win32_create_window(current);
 	HDC window_dc = GetDC(window);
+	win32_initialize_opengl(window_dc);
 	ShowWindow(window, show_code);
 
 	GameMemory game_memory = platform_memory_game_allocate(
@@ -264,15 +295,7 @@ int WINAPI WinMain(HINSTANCE current, HINSTANCE previous, LPSTR command, int sho
 			game_initialize(&game_memory);
 		}
 
-		while (PeekMessage(&current_message, window, 0, 0, PM_REMOVE)) {
-			if (current_message.message == WM_QUIT) {
-				win32.is_running = false;
-				win32.return_code = current_message.wParam;
-			}
-			TranslateMessage(&current_message);
-			DispatchMessage(&current_message);
-		}
-
+		win32_handle_events(&win32, window);
 		game_update_and_render(&game_memory);
 		SwapBuffers(window_dc);
 	}
