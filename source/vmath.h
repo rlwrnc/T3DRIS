@@ -5,7 +5,6 @@
 #include <stdarg.h>
 
 // TODO:
-// - add projection matrix transformations
 // - replace gimble rotations with quaternion rotations
 
 /*
@@ -25,7 +24,7 @@ typedef float vec4[4];
 
 typedef vec4 mat4[4];
 
-typedef float quat[4];
+typedef vec4 quat;
 
 static inline void mat4_identity(mat4 m)
 {
@@ -61,52 +60,42 @@ static inline void mat4_translate(mat4 result, float x, float y, float z)
 	result[3][2] = z;
 }
 
+static inline void mat4_rotateq(mat4 result, quat rotation)
+{
+	float r = rotation[0], i = rotation[1], j = rotation[2], k = rotation[3];
+	float s = 1 / (square(r) + square(i) + square(j) + square(k));
+
+	result[0][0] = 1 - 2 * s * (square(j) + square(k));
+	result[0][1] = 2 * s * (i * j + k * r);
+	result[0][2] = 2 * s * (i * k - j * r);
+	result[0][3] = 0.0;
+
+	result[1][0] = 2 * s * (i * j - k * r);
+	result[1][1] = 1 - 2 * s * (square(i) + square(k));
+	result[1][2] = 2 * s * (j * k + i * r);
+	result[1][3] = 0.0;
+
+	result[2][0] = 2 * s * (i * k + j * r);
+	result[2][1] = 2 * s * (j * k - i * r);
+	result[2][2] = 1 - 2 * s * (square(i) + square(j));
+	result[2][3] = 0.0;
+
+	result[3][0] = 0.0;
+	result[3][1] = 0.0;
+	result[3][2] = 0.0;
+	result[3][3] = 1.0;
+}
+
 // NOTE: all angles are expressed in TURNS
-static inline void mat4_rotate_x(mat4 result, float x)
+static inline void mat4_rotate(mat4 result, float angle, vec3 axis)
 {
-	float sinx = sinf(TAU * x), cosx = cosf(TAU * x);
-	mat4_identity(result);
-	result[0][0] = 1.0;
-	result[1][1] = cosx;
-	result[2][2] = cosx;
-	result[3][3] = 1.0;
-	result[1][2] = sinx;
-	result[2][1] = -sinx;
-}
-
-static inline void mat4_rotate_y(mat4 result, float y)
-{
-	float siny = sinf(TAU * y), cosy = cosf(TAU * y);
-	mat4_identity(result);
-	result[0][0] = cosy;
-	result[1][1] = 1.0;
-	result[2][2] = cosy;
-	result[3][3] = 1.0;
-	result[0][2] = -siny;
-	result[2][0] = siny;
-}
-
-static inline void mat4_rotate_z(mat4 result, float z)
-{
-	float sinz = sinf(TAU * z), cosz = cosf(TAU * z);
-	mat4_identity(result);
-	result[0][0] = cosz;
-	result[1][1] = cosz;
-	result[2][2] = 1.0;
-	result[3][3] = 1.0;
-	result[0][1] = sinz;
-	result[1][0] = -sinz;
-}
-
-static inline void mat4_rotate(mat4 result, float x, float y, float z)
-{
-	mat4 rx, ry, rz, rzy, rzyx;
-	mat4_rotate_x(rx, x);
-	mat4_rotate_y(ry, y);
-	mat4_rotate_z(rz, z);
-	mat4_multiply(rzy, rz, ry);
-	mat4_multiply(rzyx, rzy, rx);
-	memcpy(result, rzyx, sizeof rzyx);
+	quat rotation;
+	float sina_halves = sinf((TAU * angle) / 2.0);
+	rotation[0] = cosf((TAU * angle) / 2.0);
+	rotation[1] = sina_halves * axis[0];
+	rotation[2] = sina_halves * axis[1];
+	rotation[3] = sina_halves * axis[2];
+	mat4_rotateq(result, rotation);
 }
 
 static inline void mat4_scale(mat4 result, float x, float y, float z)
@@ -127,23 +116,4 @@ static inline void mat4_perspective(mat4 result, float fov, float aspect_ratio,
 	result[2][2] = (f + n) / (f - n);
 	result[2][3] = -1.0;
 	result[3][2] = (2 * f * n) / (f - n);
-}
-
-static inline void mat4_rotation(mat4 result, quat rotation)
-{
-	memset(result, 0.0, 16 * sizeof (float));
-
-	result[0][0] = 1 - 2 * (square(rotation[2]) + square(rotation[3]));
-	result[0][1] = 2 * (rotation[1] * rotation[2] + rotation[3] * rotation[0]);
-	result[0][2] = 2 * (rotation[1] * rotation[3] + rotation[2] * rotation[0]);
-
-	result[1][0] = 2 * (rotation[1] * rotation[2] - rotation[3] * rotation[0]);
-	result[1][1] = 1 - 2 * (square(rotation[1]) + square(rotation[3]));
-	result[1][2] = 2 * (rotation[2] * rotation[3] + rotation[1] * rotation[0]);
-
-	result[2][0] = 2 * (rotation[1] * rotation[3] + rotation[2] * rotation[0]);
-	result[2][1] = 2 * (rotation[2] * rotation[3] + rotation[1] * rotation[0]);
-	result[2][2] = 1 - 2 * (square(rotation[1]) - square(rotation[2]));
-
-	result[3][3] = 1.0;
 }
