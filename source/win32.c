@@ -11,7 +11,7 @@ static inline HGLRC win32_initialize_opengl(HDC device_context);
 OpenGLFunctions win32_load_opengl_functions()
 {
 	OpenGLFunctions result = {0};
-	FOR_EACH_GL_FUNCTION(LOAD_GL_FUNCTION)
+	FOR_EACH_GL_FUNCTION(LOAD_GL_FUNCTION_WIN32)
 	return result;
 }
 
@@ -19,9 +19,11 @@ void *platform_hotload_load_game_code(const char *compile_path, const char *load
 {
 	CopyFile(compile_path, load_path, false);
 	HMODULE code_handle = LoadLibraryA(load_path);
-	DWORD error = GetLastError();
-	fprintf(stderr, "%ld\n", error);
-	assert(code_handle);
+	if (code_handle == 0) {
+		DWORD error = GetLastError();
+		fprintf(stderr, "%ld\n", error);
+		exit(1);
+	}
 
 	game_initialize = (game_initialize_func *)
 		GetProcAddress(code_handle, "game_initialize");
@@ -57,34 +59,42 @@ void platform_hotload_unload_game_code(void *code_handle)
 }
 #endif
 
-GameMemory platform_memory_game_allocate(size_t size_permanent, size_t size_transient)
+GameMemory platform_initialize_game_memory(size_t size_permanent, size_t size_transient)
 {
 #if TED_RELEASE == 0
 	LPVOID base_address = (LPVOID) terabytes(3);
 #else
 	LPVOID base_address = 0;
 #endif
+
 	GameMemory new_memory = {0};
-	new_memory.size_permanent = size_permanent;
-	new_memory.size_transient = size_transient;
 	new_memory.size_total = size_permanent + size_transient;
-	new_memory.permanent = VirtualAlloc(
+
+	MemoryArena permanent = {0}, transient = {0};
+	permanent.size = size_permanent;
+	permanent.base = VirtualAlloc(
 			base_address,
 			new_memory.size_total,
 			MEM_RESERVE | MEM_COMMIT,
 			PAGE_READWRITE);
-	new_memory.transient = (u8 *) new_memory.permanent + new_memory.size_permanent;
+	permanent.top = permanent.base;
+	transient.size = size_transient;
+	transient.base = (u8 *) permanent.base + size_transient;
+	transient.top = transient.base;
+	new_memory.permanent = permanent;
+	new_memory.transient = transient;
+
 	return new_memory;
 }
 
 int platform_memory_game_deallocate(GameMemory *memory)
 {
-	memory->size_permanent = 0;
-	memory->size_transient = 0;
-	memory->transient = 0;
-	int retval = VirtualFree(memory->permanent, memory->size_total, MEM_DECOMMIT | MEM_RELEASE);
-	memory->size_total = 0;
-	return retval;
+	int result = VirtualFree(
+			memory->permanent.base,
+			memory->size_total,
+			MEM_DECOMMIT | MEM_RELEASE);
+	*memory = (GameMemory) {0};
+	return result;
 }
 
 static LRESULT CALLBACK window_callback(HWND window, UINT message, WPARAM wparam,
@@ -275,15 +285,16 @@ int WINAPI WinMain(HINSTANCE current, HINSTANCE previous, LPSTR command, int sho
 	win32_initialize_opengl(window_dc);
 	ShowWindow(window, show_code);
 
-	GameMemory game_memory = platform_memory_game_allocate(
+	GameMemory game_memory = platform_initialize_game_memory(
 			kilobytes(64),
-			megabytes(512));
-	OpenGLFunctions *gl = game_memory.permanent;
+			megabytes(128));
+	OpenGLFunctions *gl = (OpenGLFunctions *)
+		arena_allocate(&game_memory.permanent, sizeof (OpenGLFunctions));
 	*gl = win32_load_opengl_functions();
+	arena_allocate(&game_memory.permanent, sizeof (GameState));
 
-	void *game_code_handle = platform_hotload_load_game_code("game.dll",
-			"game_load.dll");
-	game_initialize(&game_memory);
+	void *game_code_handle = platform_hotload_load_game_code("game.dll", "game_load.dll");
+	game_initialize(&game_memory, gl);
 
 	win32.is_running = true;
 	MSG current_message = {0};
@@ -292,7 +303,7 @@ int WINAPI WinMain(HINSTANCE current, HINSTANCE previous, LPSTR command, int sho
 			platform_hotload_unload_game_code(game_code_handle);
 			game_code_handle = platform_hotload_load_game_code("game.dll",
 					"game_load.dll");
-			game_initialize(&game_memory);
+			game_initialize(&game_memory, gl);
 		}
 
 		win32_handle_events(&win32, window);

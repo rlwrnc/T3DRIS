@@ -290,7 +290,7 @@
         DO(PFNGLGETFRAGDATAINDEXPROC, GetFragDataIndex) \
         DO(PFNGLISSAMPLERPROC, IsSampler)
 #define DEFINE_GL_FUNCTION(type, name) type name;
-#define LOAD_GL_FUNCTION(type, name) result.name = (type) wglGetProcAddress("gl" #name);
+#define LOAD_GL_FUNCTION_WIN32(type, name) result.name = (type) wglGetProcAddress("gl" #name);
 
 typedef struct OpenGLInfo OpenGLInfo;
 typedef struct OpenGLFunctions OpenGLFunctions;

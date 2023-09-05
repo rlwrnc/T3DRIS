@@ -4,9 +4,6 @@
 #include <string.h>
 #include <stdarg.h>
 
-// TODO:
-// - replace gimble rotations with quaternion rotations
-
 /*
 NOTE: vmath only provides vector/matrix math plus some useful transforms
 it does not combine these transformations; that is for the renderer to do.
@@ -25,6 +22,46 @@ typedef float vec4[4];
 typedef vec4 mat4[4];
 
 typedef vec4 quat;
+
+static inline float vec3_magnitude(vec3 vector)
+{
+	float result = sqrtf(square(vector[0]) + square(vector[1]) + square(vector[2]));
+	return result;
+}
+
+static inline void vec3_add(vec3 result, vec3 left, vec3 right)
+{
+	result[0] = left[0] + right[0];
+	result[1] = left[1] + right[1];
+	result[2] = left[2] + right[2];
+}
+
+static inline void vec3_subtract(vec3 result, vec3 left, vec3 right)
+{
+	result[0] = left[0] - right[0];
+	result[1] = left[1] - right[1];
+	result[2] = left[2] - right[2];
+}
+
+static inline void vec3_normalize(vec3 result)
+{
+	float magnitude = vec3_magnitude(result);
+	result[0] /= magnitude;
+	result[1] /= magnitude;
+	result[2] /= magnitude;
+}
+
+static inline void vec3_cross(vec3 result, vec3 left, vec3 right)
+{
+	result[0] = left[1] * right[2] - left[2] * right[1];
+	result[1] = left[2] * right[0] - left[0] * right[2];
+	result[2] = left[0] * right[1] - left[1] * right[0];
+}
+
+static inline float vec3_dot(vec3 left, vec3 right)
+{
+	return left[0] * right[0] + left[1] * right[1] + left[2] * right[2];
+}
 
 static inline void mat4_identity(mat4 m)
 {
@@ -60,7 +97,7 @@ static inline void mat4_translate(mat4 result, float x, float y, float z)
 	result[3][2] = z;
 }
 
-static inline void mat4_rotateq(mat4 result, quat rotation)
+static inline void quat_to_mat4(mat4 result, quat rotation)
 {
 	float r = rotation[0], i = rotation[1], j = rotation[2], k = rotation[3];
 	float s = 1 / (square(r) + square(i) + square(j) + square(k));
@@ -95,7 +132,7 @@ static inline void mat4_rotate(mat4 result, float angle, vec3 axis)
 	rotation[1] = sina_halves * axis[0];
 	rotation[2] = sina_halves * axis[1];
 	rotation[3] = sina_halves * axis[2];
-	mat4_rotateq(result, rotation);
+	quat_to_mat4(result, rotation);
 }
 
 static inline void mat4_scale(mat4 result, float x, float y, float z)
@@ -110,10 +147,47 @@ static inline void mat4_scale(mat4 result, float x, float y, float z)
 static inline void mat4_perspective(mat4 result, float fov, float aspect_ratio,
 		float n, float f)
 {
-	float half_tan = tanf(1.0 / (TAU * fov));
-	result[0][0] = 1.0 / (aspect_ratio * half_tan);
-	result[1][1] = 1.0 / (half_tan);
-	result[2][2] = (f + n) / (f - n);
+	float half_tan = tanf((TAU * fov) / 2.0);
+	float top = half_tan * n;
+	float right = top * aspect_ratio;
+
+	result[0][0] = n / right;
+	result[1][1] = n / top;
+	result[2][2] = -(f + n) / (f - n);
 	result[2][3] = -1.0;
-	result[3][2] = (2 * f * n) / (f - n);
+	result[3][2] = (-2 * f * n) / (f - n);
+	result[3][3] = 0.0;
+}
+
+static inline void mat4_lookat(mat4 result, vec3 from, vec3 to)
+{
+	vec3 forward = {0};
+	vec3_subtract(forward, from, to);
+	vec3_normalize(forward);
+
+	vec3 right = {0};
+	vec3 y_base = {0.0, 1.0, 0.0};
+	vec3_cross(right, y_base, forward);
+	vec3_normalize(right);
+
+	vec3 up = {0};
+	vec3_cross(up, forward, right);
+
+	vec3 negative_from;
+	vec3_subtract(negative_from, (vec3) {0}, from);
+
+	mat4_identity(result);
+	result[0][0] = right[0];
+	result[0][1] = right[1];
+	result[0][2] = right[2];
+	result[1][0] = up[0];
+	result[1][1] = up[1];
+	result[1][2] = up[2];
+	result[2][0] = forward[0];
+	result[2][1] = forward[1];
+	result[2][2] = forward[2];
+	result[3][0] = vec3_dot(right, negative_from);
+	result[3][1] = vec3_dot(up, negative_from);
+	result[3][2] = vec3_dot(forward, negative_from);
+
 }

@@ -15,6 +15,7 @@
 /* #include "glfw/glfw3.h" */
 #include "vmath.h"
 #include "opengl.h"
+#include "memory.c"
 
 #define kilobytes(value) ((value) * 1024LL)
 #define megabytes(value) (kilobytes(value) * 1024LL)
@@ -36,7 +37,7 @@ typedef struct GameState GameState;
 typedef struct OpenGLState OpenGLState;
 
 #if TED_RELEASE == 0
-typedef void game_initialize_func(GameMemory *memory);
+typedef void game_initialize_func(GameMemory *memory, OpenGLFunctions *gl_funcs);
 typedef void game_update_and_render_func(GameMemory *memory);
 #else
 void game_initialize(GameMemory *);
@@ -44,14 +45,12 @@ void game_update_and_render(GameMemory *);
 #endif
 
 struct GameState {
-	GLuint vbo, vao;
+	GLuint vbo, vao, ebo, program;
 	GLint model_location, view_location, projection_location;
+	mat4 model, view, projection;
+	GLint header;
+	GLuint *cube_elements;
+	float game_board[10][10][20];
 };
 
-struct GameMemory {
-	size_t size_permanent;
-	size_t size_transient;
-	size_t size_total;
-	void *permanent;
-	void *transient;
-};
+static OpenGLFunctions gl;
