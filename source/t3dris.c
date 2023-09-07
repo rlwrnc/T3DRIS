@@ -1,17 +1,21 @@
 #include "t3dris.h"
 #include "memory.c"
+#include "renderer.c"
 
 /* TODO:
  * - add camera
  * - abstract renderer
  */
 
+#define CAMERA_RADIUS 5.0
+
 
 // TODO: move global variables to game memory
 static mat4 model = IDENTITY4, view = IDENTITY4, projection = IDENTITY4;
 GLint header[2];
 static GLuint vbo, ebo, vao = 0, program;
-static GLint model_location = 0, view_location = 0, projection_location = 0;
+static GLint view_location = 0, projection_location = 0;
+static GLint view_position_location = 0, light_position_location = 0;
 GLuint *cube_elements;
 
 inline GLuint compile_shader(const char *path, GLenum type)
@@ -35,6 +39,7 @@ inline GLuint compile_shader(const char *path, GLenum type)
 	char info_log[512];
 	gl.GetShaderiv(shader, GL_COMPILE_STATUS, &success);
 	if (!success) {
+		fprintf(stderr, "%s:\n", path);
 		gl.GetShaderInfoLog(shader, 512, 0, info_log);
 		fprintf(stderr, "%s\n", info_log);
 	}
@@ -85,15 +90,6 @@ void game_initialize(GameMemory *memory, OpenGLFunctions *gl_funcs)
 
 	program = compile_and_link_shader_program("shaders/vertex.glsl", "shaders/fragment.glsl");
 
-	FILE *mesh_file = fopen("cube.dsm", "rb");
-	float *cube_vertices;
-	fread(header, sizeof (float), 2, mesh_file);
-	cube_vertices = calloc(header[0], sizeof (float));
-	cube_elements = calloc(header[1], sizeof (GLuint));
-	fread(cube_vertices, sizeof (float), header[0], mesh_file);
-	fread(cube_elements, sizeof (GLuint), header[1], mesh_file);
-	fclose(mesh_file);
-
 	mat4 translation, rotation, scale;
 	mat4_translate(translation, 0.0, 0.0, 0.0);
 	vec3 rotation_axis = {1.0, 1.0, 0.0};
@@ -104,75 +100,47 @@ void game_initialize(GameMemory *memory, OpenGLFunctions *gl_funcs)
 	mat4_multiply(state->model, state->model, rotation);
 	mat4_multiply(state->model, state->model, scale);
 
-	/* mat4 camera_rotation = IDENTITY4; */
-	/* vec3 camera_rotation_axis = {1.0, 0.0, 0.0}; */
-	/* mat4_rotate(camera_rotation, 1.0 / 8.5, camera_rotation_axis); */
-	/* mat4 camera_translate; */
-	/* mat4_multiply(view, view, camera_rotation); */
-	/* mat4_multiply(view, view, camera_translate); */
-	/* mat4_translate(camera_translate, 0.0, 1.0, -1.0); */
-	/* mat4_multiply(view, view, camera_translate); */
-	/* mat4_translate(view, 0.0, -1.0, -1.0); */
-
-	mat4_lookat(view, (vec3) {0.0, 0.0, 10.0}, (vec3) {0.0});
+	mat4_lookat(view, (vec3) {-0.0, -0.0, 6.0}, (vec3) {0.0});
 
 	mat4_perspective(projection, 0.125, 1920.0 / 1080.0, 0.1, 100.0);
 
 	// NOTE: don't forget to bind the program when setting uniforms!
 	gl.UseProgram(program);
-	model_location = gl.GetUniformLocation(program, "model");
 	int retval = glGetError();
 	view_location = gl.GetUniformLocation(program, "view");
 	retval = glGetError();
 	projection_location = gl.GetUniformLocation(program, "projection");
 	retval = glGetError();
-	gl.UniformMatrix4fv(model_location, 1, GL_FALSE, (float *) model);
+	view_position_location = gl.GetUniformLocation(program, "view_position");
+	light_position_location = gl.GetUniformLocation(program, "light_position");
 	gl.UniformMatrix4fv(view_location, 1, GL_FALSE, (float *) view);
 	gl.UniformMatrix4fv(projection_location, 1, GL_FALSE, (float *) projection);
+	gl.Uniform3f(light_position_location, 1.0, 1.0, 2.0);
 	gl.UseProgram(0);
 
-	// initialize_cube();
+	initialize_cube(program);
 	
-	gl.GenVertexArrays(1, &vao);
-	gl.BindVertexArray(vao);
-
-	gl.GenBuffers(1, &vbo);
-	gl.BindBuffer(GL_ARRAY_BUFFER, vbo);
-	gl.BufferData(GL_ARRAY_BUFFER, header[0] * sizeof(float), cube_vertices, GL_STATIC_DRAW);
-	
-	gl.GenBuffers(1, &ebo);
-	gl.BindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-	gl.BufferData(GL_ELEMENT_ARRAY_BUFFER, header[1] * sizeof(GLuint), cube_elements, GL_STATIC_DRAW);
-
-	gl.VertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof (float), (void *) 0);
-	gl.VertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof (float), (void *) (3 * sizeof (float)));
-	gl.EnableVertexAttribArray(0);
-	gl.EnableVertexAttribArray(1);
-
-	gl.BindBuffer(GL_ARRAY_BUFFER, 0);
-	gl.BindVertexArray(0);
-
 	glEnable(GL_DEPTH_TEST);
 }
 
 //
-void game_update_and_render(GameMemory *memory)
+
+void game_update_and_render(GameMemory *memory, float delta_time)
 {
+	static float angle = 0;
 	GameState *state = (GameState *) arena_peek(&memory->permanent);
-	glClearColor(0.4f, 0.6f, 0.0f, 1.0f);
+	/* glClearColor(0.4f, 0.6f, 0.0f, 1.0f); */
+	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	// gl.UseProgram(program);
-	// for (int i = 0; i < game_board_size; i++) {
-	//	if (game_board[i] != 0)
-	//		render_cube(position(i), 0, 0);
-	// }
-	// gl.UseProgram(0);
+	mat4 view = {0};
+	angle += 1.0 * delta_time;
+	vec3 camera_location = { CAMERA_RADIUS * sin(angle), 0, CAMERA_RADIUS * cos(angle) };
+	mat4_lookat(view, camera_location, (vec3) {0});
 
 	gl.UseProgram(program);
-	gl.BindVertexArray(vao);
-	/* glDrawArrays(GL_TRIANGLES, 0, 36); */
-	glDrawElements(GL_TRIANGLES, header[1], GL_UNSIGNED_INT, 0);
-	gl.BindVertexArray(0);
+	gl.UniformMatrix4fv(view_location, 1, GL_FALSE, (float *) view);
+	gl.Uniform3fv(view_position_location, 1, (float *) camera_location);
+	render_cube((vec3) {0}, 0, (vec3) {1.0, 1.0, 1.0}, (vec4) {1.0, 0.0, 1.0, 1.0});
 	gl.UseProgram(0);
 }

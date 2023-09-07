@@ -146,6 +146,22 @@ static void win32_handle_events(Win32State *state, HWND window)
 					state->is_running = false;
 					state->return_code = 0;
 				}
+
+				if (keycode == 'W' && is_down) {
+					OutputDebugString("UP");
+				}
+
+				if (keycode == 'A' && is_down) {
+					OutputDebugString("LEFT");
+				}
+
+				if (keycode == 'S' && is_down) {
+					OutputDebugString("DOWN");
+				}
+
+				if (keycode == 'D' && is_down) {
+					OutputDebugString("RIGHT");
+				}
 			} break;
 			default: {
 				TranslateMessage(&message);
@@ -277,6 +293,7 @@ static inline HWND win32_create_window(HINSTANCE instance)
 	return window;
 }
 
+
 int WINAPI WinMain(HINSTANCE current, HINSTANCE previous, LPSTR command, int show_code)
 {
 	Win32State win32 = {0};
@@ -293,8 +310,16 @@ int WINAPI WinMain(HINSTANCE current, HINSTANCE previous, LPSTR command, int sho
 	*gl = win32_load_opengl_functions();
 	arena_allocate(&game_memory.permanent, sizeof (GameState));
 
+	LARGE_INTEGER previous_time, current_time, performace_frequency;
+	QueryPerformanceFrequency(&performace_frequency);
+	QueryPerformanceCounter(&previous_time);
+
 	void *game_code_handle = platform_hotload_load_game_code("game.dll", "game_load.dll");
 	game_initialize(&game_memory, gl);
+	
+	QueryPerformanceCounter(&current_time);
+	u64 ms_elapsed = (current_time.QuadPart - previous_time.QuadPart);
+	float delta_time = (float) ms_elapsed / performace_frequency.QuadPart;
 
 	win32.is_running = true;
 	MSG current_message = {0};
@@ -307,8 +332,14 @@ int WINAPI WinMain(HINSTANCE current, HINSTANCE previous, LPSTR command, int sho
 		}
 
 		win32_handle_events(&win32, window);
-		game_update_and_render(&game_memory);
+		game_update_and_render(&game_memory, delta_time);
 		SwapBuffers(window_dc);
+
+		previous_time = current_time;
+		QueryPerformanceCounter(&current_time);
+		ms_elapsed = (current_time.QuadPart - previous_time.QuadPart);
+		delta_time = (float) ms_elapsed / performace_frequency.QuadPart;
+		printf("%f\n", delta_time);
 	}
 
 	return win32.return_code;

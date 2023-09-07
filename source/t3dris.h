@@ -38,7 +38,7 @@ typedef struct OpenGLState OpenGLState;
 
 #if TED_RELEASE == 0
 typedef void game_initialize_func(GameMemory *memory, OpenGLFunctions *gl_funcs);
-typedef void game_update_and_render_func(GameMemory *memory);
+typedef void game_update_and_render_func(GameMemory *memory, float delta_time);
 #else
 void game_initialize(GameMemory *);
 void game_update_and_render(GameMemory *);
