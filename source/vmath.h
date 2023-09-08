@@ -43,6 +43,13 @@ static inline void vec3_subtract(vec3 result, vec3 left, vec3 right)
 	result[2] = left[2] - right[2];
 }
 
+static inline void vec3_multiply(vec3 result, float scalar, vec3 vector)
+{
+	result[0] = scalar * vector[0];
+	result[1] = scalar * vector[1];
+	result[2] = scalar * vector[2];
+}
+
 static inline void vec3_normalize(vec3 result)
 {
 	float magnitude = vec3_magnitude(result);
@@ -176,18 +183,19 @@ static inline void mat4_lookat(mat4 result, vec3 from, vec3 to)
 	vec3 negative_from;
 	vec3_subtract(negative_from, (vec3) {0}, from);
 
-	mat4_identity(result);
-	result[0][0] = right[0];
-	result[0][1] = right[1];
-	result[0][2] = right[2];
-	result[1][0] = up[0];
-	result[1][1] = up[1];
-	result[1][2] = up[2];
-	result[2][0] = forward[0];
-	result[2][1] = forward[1];
-	result[2][2] = forward[2];
-	result[3][0] = vec3_dot(right, negative_from);
-	result[3][1] = vec3_dot(up, negative_from);
-	result[3][2] = vec3_dot(forward, negative_from);
+	mat4 rotation = IDENTITY4;
+	rotation[0][0] = right[0];
+	rotation[0][1] = up[0];
+	rotation[0][2] = forward[0];
+	rotation[1][0] = right[1];
+	rotation[1][1] = up[1];
+	rotation[1][2] = forward[1];
+	rotation[2][0] = right[2];
+	rotation[2][1] = up[2];
+	rotation[2][2] = forward[2];
 
+	mat4 translation = IDENTITY4;
+	mat4_translate(translation, -from[0], -from[1], -from[2]);
+
+	mat4_multiply(result, rotation, translation);
 }

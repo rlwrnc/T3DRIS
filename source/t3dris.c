@@ -2,21 +2,9 @@
 #include "memory.c"
 #include "renderer.c"
 
-/* TODO:
- * - add camera
- * - abstract renderer
- */
+#define PI 3.1415926535
 
 #define CAMERA_RADIUS 5.0
-
-
-// TODO: move global variables to game memory
-static mat4 model = IDENTITY4, view = IDENTITY4, projection = IDENTITY4;
-GLint header[2];
-static GLuint vbo, ebo, vao = 0, program;
-static GLint view_location = 0, projection_location = 0;
-static GLint view_position_location = 0, light_position_location = 0;
-GLuint *cube_elements;
 
 inline GLuint compile_shader(const char *path, GLenum type)
 {	
@@ -88,59 +76,64 @@ void game_initialize(GameMemory *memory, OpenGLFunctions *gl_funcs)
 		.model = IDENTITY4, .view = IDENTITY4, .projection = IDENTITY4
 	};
 
-	program = compile_and_link_shader_program("shaders/vertex.glsl", "shaders/fragment.glsl");
+	state->program = compile_and_link_shader_program("shaders/vertex.glsl",
+			"shaders/fragment.glsl");
 
-	mat4 translation, rotation, scale;
-	mat4_translate(translation, 0.0, 0.0, 0.0);
-	vec3 rotation_axis = {1.0, 1.0, 0.0};
-	mat4_rotate(rotation, 1.0 / 12.0, rotation_axis);
-	mat4_scale(scale, 0.25, 0.25, 0.25);
-
-	mat4_multiply(state->model, state->model, translation);
-	mat4_multiply(state->model, state->model, rotation);
-	mat4_multiply(state->model, state->model, scale);
-
-	mat4_lookat(view, (vec3) {-0.0, -0.0, 6.0}, (vec3) {0.0});
-
-	mat4_perspective(projection, 0.125, 1920.0 / 1080.0, 0.1, 100.0);
+	mat4_lookat(state->view, (vec3) {-0.0, -0.0, 6.0}, (vec3) {0.0});
+	mat4_perspective(state->projection, 0.125, 1920.0 / 1080.0, 0.1, 100.0);
 
 	// NOTE: don't forget to bind the program when setting uniforms!
-	gl.UseProgram(program);
+	gl.UseProgram(state->program);
 	int retval = glGetError();
-	view_location = gl.GetUniformLocation(program, "view");
+	state->view_location = gl.GetUniformLocation(state->program, "view");
 	retval = glGetError();
-	projection_location = gl.GetUniformLocation(program, "projection");
+	state->projection_location = gl.GetUniformLocation(state->program, "projection");
 	retval = glGetError();
-	view_position_location = gl.GetUniformLocation(program, "view_position");
-	light_position_location = gl.GetUniformLocation(program, "light_position");
-	gl.UniformMatrix4fv(view_location, 1, GL_FALSE, (float *) view);
-	gl.UniformMatrix4fv(projection_location, 1, GL_FALSE, (float *) projection);
-	gl.Uniform3f(light_position_location, 1.0, 1.0, 2.0);
+	state->view_position_location = gl.GetUniformLocation(state->program, "view_position");
+	state->light_position_location = gl.GetUniformLocation(state->program, "light_position");
+	gl.UniformMatrix4fv(state->view_location, 1, GL_FALSE, (float *) state->view);
+	gl.UniformMatrix4fv(state->projection_location, 1, GL_FALSE, (float *) state->projection);
+	gl.Uniform3f(state->light_position_location, 1.0, 1.0, 2.0);
 	gl.UseProgram(0);
 
-	initialize_cube(program);
+	initialize_cube(state->program);
 	
 	glEnable(GL_DEPTH_TEST);
 }
 
-//
+static u8 game_board[2][2][2] = {0};
 
 void game_update_and_render(GameMemory *memory, float delta_time)
 {
-	static float angle = 0;
+	static float theta = 0.0, phi = PI / 6;
 	GameState *state = (GameState *) arena_peek(&memory->permanent);
 	/* glClearColor(0.4f, 0.6f, 0.0f, 1.0f); */
 	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	mat4 view = {0};
-	angle += 1.0 * delta_time;
-	vec3 camera_location = { CAMERA_RADIUS * sin(angle), 0, CAMERA_RADIUS * cos(angle) };
+	theta += 1.0 * delta_time;
+	/* theta = 0; */
+	vec3 camera_location = {
+		CAMERA_RADIUS * sinf(phi) * sinf(theta),
+		CAMERA_RADIUS * cosf(phi),
+		CAMERA_RADIUS * sinf(phi) * cosf(theta)
+	};
+	/* vec3 camera_location = {0, 0, 5}; */
 	mat4_lookat(view, camera_location, (vec3) {0});
 
-	gl.UseProgram(program);
-	gl.UniformMatrix4fv(view_location, 1, GL_FALSE, (float *) view);
-	gl.Uniform3fv(view_position_location, 1, (float *) camera_location);
-	render_cube((vec3) {0}, 0, (vec3) {1.0, 1.0, 1.0}, (vec4) {1.0, 0.0, 1.0, 1.0});
+	game_board[0][0][0] = 1;
+	game_board[0][1][0] = 1;
+	game_board[1][1][0] = 1;
+	game_board[1][1][1] = 1;
+
+	gl.UseProgram(state->program);
+	gl.UniformMatrix4fv(state->view_location, 1, GL_FALSE, (float *) view);
+	gl.Uniform3fv(state->view_position_location, 1, (float *) camera_location);
+	for (int i = 0; i < 2; i++)
+		for (int j = 0; j < 2; j++)
+			for (int k = 0; k < 2; k++)
+				if (game_board[i][j][k] != 0)
+					render_cube((vec3) {i, j, k}, 0, (vec3) {1.0, 1.0, 1.0}, (vec4) {1.0, 0.0, 1.0, 1.0});
 	gl.UseProgram(0);
 }

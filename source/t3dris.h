@@ -45,11 +45,9 @@ void game_update_and_render(GameMemory *);
 #endif
 
 struct GameState {
-	GLuint vbo, vao, ebo, program;
-	GLint model_location, view_location, projection_location;
+	GLuint program;
+	GLint view_location, projection_location, view_position_location, light_position_location;
 	mat4 model, view, projection;
-	GLint header;
-	GLuint *cube_elements;
 	float game_board[10][10][20];
 };
 

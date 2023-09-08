@@ -46,6 +46,13 @@ static float cube_vertices[] = {
 	-0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f
 };
 
+struct Primitive {
+	GLuint vbo, vao;
+	GLint model_location, color_location;
+	float *vertices;
+	u32 num_vertices;
+};
+
 static GLuint cube_vbo, cube_vao, cube_ebo;
 static GLuint model_location, color_location;
 

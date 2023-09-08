@@ -317,6 +317,7 @@ int WINAPI WinMain(HINSTANCE current, HINSTANCE previous, LPSTR command, int sho
 	void *game_code_handle = platform_hotload_load_game_code("game.dll", "game_load.dll");
 	game_initialize(&game_memory, gl);
 	
+	// TODO: fixed-timestep facilities
 	QueryPerformanceCounter(&current_time);
 	u64 ms_elapsed = (current_time.QuadPart - previous_time.QuadPart);
 	float delta_time = (float) ms_elapsed / performace_frequency.QuadPart;
