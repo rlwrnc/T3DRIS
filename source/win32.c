@@ -52,7 +52,7 @@ bool platform_hotload_game_has_been_compiled(const char *compile_path, const cha
 
 void platform_hotload_unload_game_code(void *code_handle)
 {
-	assert(FreeLibrary(code_handle));
+	assert(FreeLibrary((HMODULE) code_handle));
 	code_handle = 0;
 	game_initialize = 0;
 	game_update_and_render = 0;
@@ -72,7 +72,7 @@ GameMemory platform_initialize_game_memory(size_t size_permanent, size_t size_tr
 
 	MemoryArena permanent = {0}, transient = {0};
 	permanent.size = size_permanent;
-	permanent.base = VirtualAlloc(
+	permanent.base = (u8 *) VirtualAlloc(
 			base_address,
 			new_memory.size_total,
 			MEM_RESERVE | MEM_COMMIT,
@@ -124,8 +124,9 @@ static LRESULT CALLBACK window_callback(HWND window, UINT message, WPARAM wparam
 	return DefWindowProc(window, message, wparam, lparam);
 }
 
-static void win32_handle_events(Win32State *state, HWND window)
+static InputState win32_handle_events(Win32State *state, HWND window, InputState previous)
 {
+	InputState input = previous;
 	MSG message = {0};
 	while (PeekMessage(&message,window, 0, 0, PM_REMOVE)) {
 		switch (message.message) {
@@ -139,28 +140,51 @@ static void win32_handle_events(Win32State *state, HWND window)
 			case WM_KEYUP: {
 				u32 keycode = (u32) message.wParam;
 				u16 key_flags = HIWORD(message.lParam);
-				bool is_down = (key_flags & KF_UP);
-				bool was_down = !(key_flags & KF_REPEAT);
+				bool is_down = !(key_flags & KF_UP);
+				bool was_down = (key_flags & KF_REPEAT);
 
+				/* fprintf(stderr, "KF_UP: %d, KF_REPEAT: %d\n", (key_flags & KF_UP), (key_flags & KF_REPEAT)); */
+
+				// TODO: only exit on escape in debug mode
 				if (keycode == VK_ESCAPE) {
 					state->is_running = false;
 					state->return_code = 0;
 				}
 
 				if (keycode == 'W' && is_down) {
-					OutputDebugString("UP");
+					OutputDebugString("W IS DOWN\n");
+					input.up = true;
+				}
+
+				if (keycode == 'W' && (!is_down && was_down)) {
+					OutputDebugString("W WAS DOWN\n");
 				}
 
 				if (keycode == 'A' && is_down) {
-					OutputDebugString("LEFT");
+					OutputDebugString("A IS DOWN");
+					input.left = true;
+				}
+
+				if (keycode == 'A' && (!is_down && was_down)) {
+					OutputDebugString("A WAS DOWN\n");
+					input.left = false;
 				}
 
 				if (keycode == 'S' && is_down) {
 					OutputDebugString("DOWN");
+					input.down = true;
 				}
 
-				if (keycode == 'D' && is_down) {
-					OutputDebugString("RIGHT");
+				if (keycode == 'D') {
+					if (is_down) {
+						OutputDebugString("D IS DOWN\n");
+						input.right = true;
+					}
+
+					if (!is_down && was_down) {
+						OutputDebugString("D WAS DOWN\n");
+						input.right = false;
+					}
 				}
 			} break;
 			default: {
@@ -169,6 +193,7 @@ static void win32_handle_events(Win32State *state, HWND window)
 			} break;
 		}
 	}
+	return input;
 }
 
 static inline void win32_load_wgl_extensions()
@@ -293,7 +318,6 @@ static inline HWND win32_create_window(HINSTANCE instance)
 	return window;
 }
 
-
 int WINAPI WinMain(HINSTANCE current, HINSTANCE previous, LPSTR command, int show_code)
 {
 	Win32State win32 = {0};
@@ -324,6 +348,8 @@ int WINAPI WinMain(HINSTANCE current, HINSTANCE previous, LPSTR command, int sho
 
 	win32.is_running = true;
 	MSG current_message = {0};
+	// NOTE: move this to game_memory?
+	InputState input = {0};
 	while (win32.is_running) {
 		if (platform_hotload_game_has_been_compiled("game.dll", "game_load.dll")) {
 			platform_hotload_unload_game_code(game_code_handle);
@@ -332,15 +358,14 @@ int WINAPI WinMain(HINSTANCE current, HINSTANCE previous, LPSTR command, int sho
 			game_initialize(&game_memory, gl);
 		}
 
-		win32_handle_events(&win32, window);
-		game_update_and_render(&game_memory, delta_time);
+		input = win32_handle_events(&win32, window, input);
+		game_update_and_render(&game_memory, delta_time, &input);
 		SwapBuffers(window_dc);
 
 		previous_time = current_time;
 		QueryPerformanceCounter(&current_time);
 		ms_elapsed = (current_time.QuadPart - previous_time.QuadPart);
 		delta_time = (float) ms_elapsed / performace_frequency.QuadPart;
-		printf("%f\n", delta_time);
 	}
 
 	return win32.return_code;

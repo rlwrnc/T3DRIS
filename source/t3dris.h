@@ -35,19 +35,27 @@ typedef int64_t i64;
 typedef struct GameMemory GameMemory;
 typedef struct GameState GameState;
 typedef struct OpenGLState OpenGLState;
+typedef struct InputState InputState;
 
 #if TED_RELEASE == 0
 typedef void game_initialize_func(GameMemory *memory, OpenGLFunctions *gl_funcs);
-typedef void game_update_and_render_func(GameMemory *memory, float delta_time);
+typedef void game_update_and_render_func(GameMemory *memory, float delta_time, InputState *input);
 #else
-void game_initialize(GameMemory *);
-void game_update_and_render(GameMemory *);
+// NOTE: it is probably not necessary to store the opengl functions on the heap if we aren't
+// hot-reloading
+void game_initialize(GameMemory *, OpenGLFunctions *gl_funcs);
+void game_update_and_render(GameMemory *, float delta_time);
 #endif
+
+struct InputState {
+	bool up, left, down, right;
+};
 
 struct GameState {
 	GLuint program;
 	GLint view_location, projection_location, view_position_location, light_position_location;
 	mat4 model, view, projection;
+	InputState input;
 	float game_board[10][10][20];
 };
 

@@ -4,7 +4,7 @@
 
 #define PI 3.1415926535
 
-#define CAMERA_RADIUS 5.0
+#define CAMERA_RADIUS 10.0
 
 inline GLuint compile_shader(const char *path, GLenum type)
 {	
@@ -84,16 +84,13 @@ void game_initialize(GameMemory *memory, OpenGLFunctions *gl_funcs)
 
 	// NOTE: don't forget to bind the program when setting uniforms!
 	gl.UseProgram(state->program);
-	int retval = glGetError();
 	state->view_location = gl.GetUniformLocation(state->program, "view");
-	retval = glGetError();
 	state->projection_location = gl.GetUniformLocation(state->program, "projection");
-	retval = glGetError();
 	state->view_position_location = gl.GetUniformLocation(state->program, "view_position");
 	state->light_position_location = gl.GetUniformLocation(state->program, "light_position");
 	gl.UniformMatrix4fv(state->view_location, 1, GL_FALSE, (float *) state->view);
 	gl.UniformMatrix4fv(state->projection_location, 1, GL_FALSE, (float *) state->projection);
-	gl.Uniform3f(state->light_position_location, 1.0, 1.0, 2.0);
+	gl.Uniform3f(state->light_position_location, 0.0, 5.0, -3.0);
 	gl.UseProgram(0);
 
 	initialize_cube(state->program);
@@ -101,19 +98,21 @@ void game_initialize(GameMemory *memory, OpenGLFunctions *gl_funcs)
 	glEnable(GL_DEPTH_TEST);
 }
 
-static u8 game_board[2][2][2] = {0};
-
-void game_update_and_render(GameMemory *memory, float delta_time)
+void game_update_and_render(GameMemory *memory, float delta_time, InputState *input)
 {
-	static float theta = 0.0, phi = PI / 6;
+	static u8 game_board[2][2][2] = {0};
+	static float theta = 0.0, phi = PI / 4;
 	GameState *state = (GameState *) arena_peek(&memory->permanent);
 	/* glClearColor(0.4f, 0.6f, 0.0f, 1.0f); */
 	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+	if (input->left)
+	     theta += 1.0 * delta_time;
+	if (input->right)
+	     theta -= 1.0 * delta_time;
+
 	mat4 view = {0};
-	theta += 1.0 * delta_time;
-	/* theta = 0; */
 	vec3 camera_location = {
 		CAMERA_RADIUS * sinf(phi) * sinf(theta),
 		CAMERA_RADIUS * cosf(phi),
@@ -134,6 +133,8 @@ void game_update_and_render(GameMemory *memory, float delta_time)
 		for (int j = 0; j < 2; j++)
 			for (int k = 0; k < 2; k++)
 				if (game_board[i][j][k] != 0)
-					render_cube((vec3) {i, j, k}, 0, (vec3) {1.0, 1.0, 1.0}, (vec4) {1.0, 0.0, 1.0, 1.0});
+					render_cube((vec3) {i, j + 0.5, k}, 0, (vec3) {1.0, 1.0, 1.0}, (vec4) {1.0, 0.0, 1.0, 1.0});
+	render_cube((vec3) {0}, 0, (vec3) {500.0, 0.0, 500.0}, (vec4) {0.4, 0.6, 0.0, 1.0});
+	render_cube((vec3){0.0, 0.5, 10.0}, 0, 0, (vec4) {1.0, 1.0, 1.0, 1.0});
 	gl.UseProgram(0);
-}
+}	
