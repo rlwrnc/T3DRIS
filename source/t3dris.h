@@ -48,7 +48,7 @@ void game_update_and_render(GameMemory *, float delta_time);
 #endif
 
 struct InputState {
-	bool up, left, down, right;
+	bool up, left, down, right, scroll_up, scroll_down;
 };
 
 struct GameState {

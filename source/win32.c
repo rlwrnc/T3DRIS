@@ -127,8 +127,9 @@ static LRESULT CALLBACK window_callback(HWND window, UINT message, WPARAM wparam
 static InputState win32_handle_events(Win32State *state, HWND window, InputState previous)
 {
 	InputState input = previous;
+	input.scroll_up = input.scroll_down = 0;
 	MSG message = {0};
-	while (PeekMessage(&message,window, 0, 0, PM_REMOVE)) {
+	while (PeekMessage(&message, window, 0, 0, PM_REMOVE)) {
 		switch (message.message) {
 			case WM_QUIT: {
 				state->is_running = false;
@@ -142,8 +143,6 @@ static InputState win32_handle_events(Win32State *state, HWND window, InputState
 				u16 key_flags = HIWORD(message.lParam);
 				bool is_down = !(key_flags & KF_UP);
 				bool was_down = (key_flags & KF_REPEAT);
-
-				/* fprintf(stderr, "KF_UP: %d, KF_REPEAT: %d\n", (key_flags & KF_UP), (key_flags & KF_REPEAT)); */
 
 				// TODO: only exit on escape in debug mode
 				if (keycode == VK_ESCAPE) {
@@ -160,9 +159,11 @@ static InputState win32_handle_events(Win32State *state, HWND window, InputState
 					OutputDebugString("W WAS DOWN\n");
 				}
 
-				if (keycode == 'A' && is_down) {
-					OutputDebugString("A IS DOWN");
-					input.left = true;
+				if (keycode == 'E') {
+					if (is_down)
+						input.left = true;
+					if (!is_down && was_down)
+						input.left = false;
 				}
 
 				if (keycode == 'A' && (!is_down && was_down)) {
@@ -175,7 +176,7 @@ static InputState win32_handle_events(Win32State *state, HWND window, InputState
 					input.down = true;
 				}
 
-				if (keycode == 'D') {
+				if (keycode == 'Q') {
 					if (is_down) {
 						OutputDebugString("D IS DOWN\n");
 						input.right = true;
@@ -186,6 +187,16 @@ static InputState win32_handle_events(Win32State *state, HWND window, InputState
 						input.right = false;
 					}
 				}
+			} break;
+			case WM_MOUSEWHEEL: {
+				i16 wheel_delta = GET_WHEEL_DELTA_WPARAM(message.wParam);
+
+				if (wheel_delta > 0)
+					input.scroll_up = true;
+				if (wheel_delta < 0)
+					input.scroll_down = true;
+
+				fprintf(stderr, "%d\n", wheel_delta);
 			} break;
 			default: {
 				TranslateMessage(&message);

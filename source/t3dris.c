@@ -4,8 +4,6 @@
 
 #define PI 3.1415926535
 
-#define CAMERA_RADIUS 10.0
-
 inline GLuint compile_shader(const char *path, GLenum type)
 {	
 	FILE *file = 0;
@@ -68,6 +66,8 @@ GLuint compile_and_link_shader_program(const char *vertex_path, const char *frag
 	return program;
 }
 
+static u8 game_board[10][20][10] = {0};
+
 void game_initialize(GameMemory *memory, OpenGLFunctions *gl_funcs)
 {
 	gl = *gl_funcs;
@@ -90,51 +90,115 @@ void game_initialize(GameMemory *memory, OpenGLFunctions *gl_funcs)
 	state->light_position_location = gl.GetUniformLocation(state->program, "light_position");
 	gl.UniformMatrix4fv(state->view_location, 1, GL_FALSE, (float *) state->view);
 	gl.UniformMatrix4fv(state->projection_location, 1, GL_FALSE, (float *) state->projection);
-	gl.Uniform3f(state->light_position_location, 0.0, 5.0, -3.0);
+	gl.Uniform3f(state->light_position_location, 5.0, 15.0, 5.0);
 	gl.UseProgram(0);
 
 	initialize_cube(state->program);
+
+	game_board[5][19][4] = 1;
 	
+	game_board[0][0][0] = 1;
+	game_board[0][0][9] = 1;
+	game_board[0][19][0] = 1;
+	game_board[0][19][9] = 1;
+	game_board[9][0][0] = 1;
+	game_board[9][0][9] = 1;
+	game_board[9][19][0] = 1;
+	game_board[9][19][9] = 1;
+
 	glEnable(GL_DEPTH_TEST);
 }
 
 void game_update_and_render(GameMemory *memory, float delta_time, InputState *input)
 {
-	static u8 game_board[2][2][2] = {0};
-	static float theta = 0.0, phi = PI / 4;
+	static float theta = PI / 4, phi = PI / 4;
+	static float camera_radius = 45.0;
+	static i32 play_turn_animation = 0;
+	static float new_theta = 0.0;
+	static float count = 0.0;
+	static u32 p = 19;
 	GameState *state = (GameState *) arena_peek(&memory->permanent);
 	/* glClearColor(0.4f, 0.6f, 0.0f, 1.0f); */
 	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	if (input->left)
-	     theta += 1.0 * delta_time;
-	if (input->right)
-	     theta -= 1.0 * delta_time;
+	if (input->left && play_turn_animation == 0) {
+		play_turn_animation = 1;
+		new_theta = theta + (PI / 2);
+	}
+
+	if (input->right && play_turn_animation == 0) {
+		play_turn_animation = -1;
+		new_theta = theta - (PI / 2);
+	}
+
+	if (play_turn_animation > 0) {
+		theta += 10.0 * delta_time;
+		if (theta > new_theta) {
+			theta = new_theta;
+			play_turn_animation = 0;
+		}
+	}
+
+	if (play_turn_animation < 0) {
+		theta -= 10.0 * delta_time;
+		if (theta < new_theta) {
+			theta = new_theta;
+			play_turn_animation = 0;
+		}
+	}
+
+	if (input->scroll_down)
+		camera_radius += 50.0 * delta_time;
+	if (input->scroll_up)
+		camera_radius -= 50.0 * delta_time;
 
 	mat4 view = {0};
 	vec3 camera_location = {
-		CAMERA_RADIUS * sinf(phi) * sinf(theta),
-		CAMERA_RADIUS * cosf(phi),
-		CAMERA_RADIUS * sinf(phi) * cosf(theta)
+		camera_radius * sinf(phi) * sinf(theta) + 5.0,
+		camera_radius * cosf(phi) + 10.0,
+		camera_radius * sinf(phi) * cosf(theta) + 5.0
 	};
-	/* vec3 camera_location = {0, 0, 5}; */
-	mat4_lookat(view, camera_location, (vec3) {0});
+	mat4_lookat(view, camera_location, (vec3) {5.0, 10.0, 5.0});
 
-	game_board[0][0][0] = 1;
-	game_board[0][1][0] = 1;
-	game_board[1][1][0] = 1;
-	game_board[1][1][1] = 1;
+
+	static bool cubes_should_fall = false;
+
+	if (count < 0.5) {
+		count += delta_time;
+		cubes_should_fall = false;
+	} else {
+		count -= 0.5;
+		cubes_should_fall = true;
+	}
+
+	for (int i = 0; i < 10; i++) {
+		for (int j = 0; j < 20; j++) {
+			for (int k = 0; k < 10; k++) {
+				if (cubes_should_fall && j > 0 && game_board[i][j][k] != 0 && game_board[i][j-1][k] == 0) {
+					game_board[i][j][k] = 0;
+					game_board[i][j-1][k] = 1;
+				}
+			}
+		}
+	}
 
 	gl.UseProgram(state->program);
 	gl.UniformMatrix4fv(state->view_location, 1, GL_FALSE, (float *) view);
 	gl.Uniform3fv(state->view_position_location, 1, (float *) camera_location);
-	for (int i = 0; i < 2; i++)
-		for (int j = 0; j < 2; j++)
-			for (int k = 0; k < 2; k++)
-				if (game_board[i][j][k] != 0)
+	for (int i = 0; i < 10; i++) {
+		for (int j = 0; j < 20; j++) {
+			for (int k = 0; k < 10; k++) {
+				if (game_board[i][j][k] == 1) {
+					// TODO: instance cube render calls?
+					// TODO: better tetronimos
 					render_cube((vec3) {i, j + 0.5, k}, 0, (vec3) {1.0, 1.0, 1.0}, (vec4) {1.0, 0.0, 1.0, 1.0});
-	render_cube((vec3) {0}, 0, (vec3) {500.0, 0.0, 500.0}, (vec4) {0.4, 0.6, 0.0, 1.0});
-	render_cube((vec3){0.0, 0.5, 10.0}, 0, 0, (vec4) {1.0, 1.0, 1.0, 1.0});
+				}
+			}
+		}
+	}
+	/* render_cube((vec3) {0}, 0, (vec3) {500.0, 0.0, 500.0}, (vec4) {0.4, 0.6, 0.0, 1.0}); */
+
+	render_cube((vec3) {4.5, -0.5, 4.5}, 0, (vec3) {10.0, 1.0, 10.0}, (vec4) {0.5, 0.5, 0.5, 1.0});
 	gl.UseProgram(0);
-}	
+}
