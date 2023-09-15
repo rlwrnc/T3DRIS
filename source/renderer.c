@@ -88,7 +88,7 @@ static void render_cube(vec3 position, quat rotation, vec3 scale, vec4 color)
 	if (rotation == 0) 
 		mat4_identity(rotation_transform);
 	else
-		quat_to_mat4(rotation_transform, rotation);
+		mat4_from_quat(rotation_transform, rotation);
 	
 	if (scale == 0) 
 		mat4_identity(scale_transform);

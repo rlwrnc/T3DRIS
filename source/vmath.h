@@ -21,7 +21,7 @@ typedef float vec4[4];
 
 typedef vec4 mat4[4];
 
-typedef vec4 quat;
+typedef vec4 quat;	// defined as { real, i, j, k }
 
 static inline float vec3_magnitude(vec3 vector)
 {
@@ -70,6 +70,51 @@ static inline float vec3_dot(vec3 left, vec3 right)
 	return left[0] * right[0] + left[1] * right[1] + left[2] * right[2];
 }
 
+static inline void quat_conjugate(quat result, quat q)
+{
+	result[0] = q[0];
+	result[1] = -q[1];
+	result[2] = -q[2];
+	result[3] = -q[3];
+}
+
+static inline float quat_norm(quat q)
+{
+	return sqrtf(square(q[0]) + square(q[1]) + square(q[2]) + square(q[3]));
+}
+
+static inline void quat_inverse(quat result, quat q)
+{
+	quat q_conj = {0};
+	quat_conjugate(q_conj, q);
+	float q_norm_squared = square(quat_norm(q));
+
+	result[0] = q_conj[0] / q_norm_squared;
+	result[1] = q_conj[1] / q_norm_squared;
+	result[2] = q_conj[2] / q_norm_squared;
+	result[3] = q_conj[3] / q_norm_squared;
+}
+
+static inline void quat_multiply(quat result, quat left, quat right)
+{
+	result[0] = left[0] * right[0] - left[1] * right[1] - left[2] * right[2] - left[3] * right[3];
+	result[1] = left[1] * right[0] + left[0] * right[1] + left[3] * right[2] - left[2] * right[3];
+	result[2] = left[2] * right[0] + left[0] * right[2] + left[3] * right[1] - left[1] * right[3];
+	result[3] = left[3] * right[0] + left[0] * right[3] + left[1] * right[2] - left[2] * right[1];
+}
+
+static inline void quat_rotate(quat result, float angle, vec3 axis)
+{
+	float angle_halves = (TAU * angle) / 2.0;
+	vec3 axis_norm = {axis[0], axis[1], axis[2]};
+	vec3_normalize(axis_norm);
+	float sin_angle = sinf(angle_halves);
+	result[0] = cosf(angle_halves);
+	result[1] = sin_angle * axis_norm[0];
+	result[2] = sin_angle * axis_norm[1];
+	result[3] = sin_angle * axis_norm[2];
+}
+
 static inline void mat4_identity(mat4 m)
 {
 	memset(m, 0.0, 16 * sizeof (float));
@@ -104,7 +149,7 @@ static inline void mat4_translate(mat4 result, float x, float y, float z)
 	result[3][2] = z;
 }
 
-static inline void quat_to_mat4(mat4 result, quat rotation)
+static inline void mat4_from_quat(mat4 result, quat rotation)
 {
 	float r = rotation[0], i = rotation[1], j = rotation[2], k = rotation[3];
 	float s = 1 / (square(r) + square(i) + square(j) + square(k));
@@ -139,7 +184,7 @@ static inline void mat4_rotate(mat4 result, float angle, vec3 axis)
 	rotation[1] = sina_halves * axis[0];
 	rotation[2] = sina_halves * axis[1];
 	rotation[3] = sina_halves * axis[2];
-	quat_to_mat4(result, rotation);
+	mat4_from_quat(result, rotation);
 }
 
 static inline void mat4_scale(mat4 result, float x, float y, float z)

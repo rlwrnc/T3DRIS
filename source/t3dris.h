@@ -16,6 +16,7 @@
 #include "vmath.h"
 #include "opengl.h"
 #include "memory.c"
+#include "camera.c"
 
 #define kilobytes(value) ((value) * 1024LL)
 #define megabytes(value) (kilobytes(value) * 1024LL)
@@ -48,7 +49,9 @@ void game_update_and_render(GameMemory *, float delta_time);
 #endif
 
 struct InputState {
-	bool up, left, down, right, scroll_up, scroll_down;
+	bool up, left, down, right;
+	bool scroll_up, scroll_down;
+	bool rotate_cw, rotate_ccw;
 };
 
 struct GameState {
@@ -56,7 +59,8 @@ struct GameState {
 	GLint view_location, projection_location, view_position_location, light_position_location;
 	mat4 model, view, projection;
 	InputState input;
-	float game_board[10][10][20];
+	float game_board[10][20][10];
+	Camera camera;
 };
 
 static OpenGLFunctions gl;

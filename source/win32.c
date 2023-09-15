@@ -150,42 +150,53 @@ static InputState win32_handle_events(Win32State *state, HWND window, InputState
 					state->return_code = 0;
 				}
 
-				if (keycode == 'W' && is_down) {
-					OutputDebugString("W IS DOWN\n");
-					input.up = true;
+				if (keycode == 'W') {
+					if (is_down)
+						input.up = true;
+
+					if (!is_down && was_down)
+						input.up = false;
 				}
 
-				if (keycode == 'W' && (!is_down && was_down)) {
-					OutputDebugString("W WAS DOWN\n");
+				if (keycode == 'D') {
+					if (is_down)
+						input.right = true;
+
+					if (!is_down && was_down)
+						input.right = false;
 				}
 
-				if (keycode == 'E') {
+				if (keycode == 'S') {
+					if (is_down)
+						input.down = true;
+
+					if (!is_down && was_down)
+						input.down = false;
+				}
+
+				if (keycode == 'A') {
 					if (is_down)
 						input.left = true;
+
 					if (!is_down && was_down)
 						input.left = false;
 				}
 
-				if (keycode == 'A' && (!is_down && was_down)) {
-					OutputDebugString("A WAS DOWN\n");
-					input.left = false;
-				}
-
-				if (keycode == 'S' && is_down) {
-					OutputDebugString("DOWN");
-					input.down = true;
-				}
-
 				if (keycode == 'Q') {
 					if (is_down) {
-						OutputDebugString("D IS DOWN\n");
-						input.right = true;
+						input.rotate_ccw = true;
 					}
 
 					if (!is_down && was_down) {
-						OutputDebugString("D WAS DOWN\n");
-						input.right = false;
+						input.rotate_ccw = false;
 					}
+				}
+
+				if (keycode == 'E') {
+					if (is_down)
+						input.rotate_cw = true;
+					if (!is_down && was_down)
+						input.rotate_cw = false;
 				}
 			} break;
 			case WM_MOUSEWHEEL: {
