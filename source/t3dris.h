@@ -48,10 +48,20 @@ void game_initialize(GameMemory *, OpenGLFunctions *gl_funcs);
 void game_update_and_render(GameMemory *, float delta_time);
 #endif
 
+typedef struct {
+	u32 transition_count;
+	bool ended_down;
+} ButtonState;
+
 struct InputState {
-	bool up, left, down, right;
-	bool scroll_up, scroll_down;
-	bool rotate_cw, rotate_ccw;
+	u32 pressed_button_count;
+	union {
+		bool buttons[6];
+		struct {
+			bool up, left, down, right;
+			bool rotate_cw, rotate_ccw;
+		};
+	};
 };
 
 struct GameState {

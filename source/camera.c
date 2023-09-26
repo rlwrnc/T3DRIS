@@ -7,7 +7,12 @@
 #define CAMERA_MIN_THETA -5.49778714378
 #define CAMERA_ROTATION_STEP 1.57079632679
 
+typedef enum CameraOrientation CameraOrientation;
 typedef struct Camera Camera;
+
+enum CameraOrientation {
+	CAM_NW, CAM_SW, CAM_SE, CAM_NE
+};
 
 struct Camera {
 	float theta, phi, radius;	// spherical coords
@@ -16,12 +21,13 @@ struct Camera {
 	float rotation_step;
 	vec3 position;			// cartesian coords
 	vec3 target;
+	CameraOrientation orientation;
 	i8 rotation_direction;		// >0 for clockwise, <0 for counter-clockwise
 };
 
 void camera_rotate(Camera *camera, float delta_time)
 {
-	if (camera->rotation_direction > 0) {
+	if (camera->rotation_direction > 0) { // CLOCKWISE
 		camera->theta += camera->rotation_speed * delta_time;
 
 		if (camera->theta > camera->target_theta) {
@@ -38,7 +44,7 @@ void camera_rotate(Camera *camera, float delta_time)
 		}
 	}
 
-	if (camera->rotation_direction < 0) {
+	if (camera->rotation_direction < 0) { // COUNTER-CLOCKWISE
 		camera->theta -= camera->rotation_speed * delta_time;
 		
 		if (camera->theta < camera->target_theta) {

@@ -12,6 +12,7 @@ inline void arena_initialize(MemoryArena *arena, GameMemory *memory, size_t size
 	arena->previous_top = 0;
 }
 
+// TODO: clean up asserts
 inline u8 *arena_allocate(MemoryArena *arena, size_t amount)
 {
 	assert(amount < arena->size - (arena->top - arena->base));

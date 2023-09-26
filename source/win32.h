@@ -7,6 +7,7 @@
 #include <stdbool.h>
 
 #include "win32_wgl.h"
+#include "t3dris.h"
 
 typedef struct {
 	bool is_running;

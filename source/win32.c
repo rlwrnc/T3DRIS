@@ -1,5 +1,4 @@
 #include "win32.h"
-#include "t3dris.h"
 
 #if TED_RELEASE == 0
 
@@ -115,25 +114,26 @@ static LRESULT CALLBACK window_callback(HWND window, UINT message, WPARAM wparam
 		} break;
 		case WM_DESTROY:
 		case WM_CLOSE: {
+			OutputDebugString("WM_CLOSE\n");
 			PostQuitMessage(0);
 		} break;
 		default: {
 			return DefWindowProc(window, message, wparam, lparam);
 		} break;
 	}
-	return DefWindowProc(window, message, wparam, lparam);
+	return 0;
 }
 
 static InputState win32_handle_events(Win32State *state, HWND window, InputState previous)
 {
 	InputState input = previous;
-	input.scroll_up = input.scroll_down = 0;
 	MSG message = {0};
 	while (PeekMessage(&message, window, 0, 0, PM_REMOVE)) {
 		switch (message.message) {
 			case WM_QUIT: {
 				state->is_running = false;
 				state->return_code = message.wParam;
+				OutputDebugString("WM_QUIT\n");
 			} break;
 			case WM_SYSKEYDOWN:
 			case WM_SYSKEYUP:
@@ -141,73 +141,87 @@ static InputState win32_handle_events(Win32State *state, HWND window, InputState
 			case WM_KEYUP: {
 				u32 keycode = (u32) message.wParam;
 				u16 key_flags = HIWORD(message.lParam);
-				bool is_down = !(key_flags & KF_UP);
-				bool was_down = (key_flags & KF_REPEAT);
+				bool was_pressed = (key_flags & KF_REPEAT);
+				bool is_pressed = !(key_flags & KF_UP);
 
-				// TODO: only exit on escape in debug mode
-				if (keycode == VK_ESCAPE) {
-					state->is_running = false;
-					state->return_code = 0;
-				}
-
-				if (keycode == 'W') {
-					if (is_down)
-						input.up = true;
-
-					if (!is_down && was_down)
-						input.up = false;
-				}
-
-				if (keycode == 'D') {
-					if (is_down)
-						input.right = true;
-
-					if (!is_down && was_down)
-						input.right = false;
-				}
-
-				if (keycode == 'S') {
-					if (is_down)
-						input.down = true;
-
-					if (!is_down && was_down)
-						input.down = false;
-				}
-
-				if (keycode == 'A') {
-					if (is_down)
-						input.left = true;
-
-					if (!is_down && was_down)
-						input.left = false;
-				}
-
-				if (keycode == 'Q') {
-					if (is_down) {
-						input.rotate_ccw = true;
+				if (is_pressed != was_pressed) {
+					// TODO: only exit on escape in debug mode
+					if (keycode == VK_ESCAPE) {
+						state->is_running = false;
+						state->return_code = 0;
 					}
 
-					if (!is_down && was_down) {
-						input.rotate_ccw = false;
+					if (keycode == 'W') {
+						if (is_pressed)  {
+							input.up = true;
+							input.pressed_button_count++;
+							OutputDebugString("is_pressed\n");
+						}
+
+						if (was_pressed) {
+							input.up = false;
+							input.pressed_button_count--;
+							OutputDebugString("was_pressed\n");
+						}
+					}
+
+					if (keycode == 'D') {
+						if (is_pressed)  {
+							input.right = true;
+							input.pressed_button_count++;
+						}
+
+						if (was_pressed) {
+							input.right = false;
+							input.pressed_button_count--;
+						}
+					}
+
+					if (keycode == 'S') {
+						if (is_pressed)  {
+							input.down = true;
+							input.pressed_button_count++;
+							fprintf(stderr, "%d\n", input.pressed_button_count);
+							OutputDebugString("is_pressed\n");
+						}
+
+						if (was_pressed) {
+							input.down = false;
+							input.pressed_button_count--;
+							fprintf(stderr, "%d\n", input.pressed_button_count);
+							OutputDebugString("was_pressed\n");
+						}
+					}
+
+					if (keycode == 'A') {
+						if (is_pressed)  {
+							input.left = true;
+							input.pressed_button_count++;
+						}
+
+						if (was_pressed) {
+							input.left = false;
+							input.pressed_button_count--;
+						}
+					}
+
+					if (keycode == 'Q') {
+						if (is_pressed) {
+							input.rotate_ccw = true;
+						}
+
+						if (was_pressed) {
+							input.rotate_ccw = false;
+						}
+					}
+
+					if (keycode == 'E') {
+						if (is_pressed)
+							input.rotate_cw = true;
+						if (was_pressed)
+							input.rotate_cw = false;
 					}
 				}
-
-				if (keycode == 'E') {
-					if (is_down)
-						input.rotate_cw = true;
-					if (!is_down && was_down)
-						input.rotate_cw = false;
-				}
-			} break;
-			case WM_MOUSEWHEEL: {
-				i16 wheel_delta = GET_WHEEL_DELTA_WPARAM(message.wParam);
-
-				if (wheel_delta > 0)
-					input.scroll_up = true;
-				if (wheel_delta < 0)
-					input.scroll_down = true;
-
-				fprintf(stderr, "%d\n", wheel_delta);
 			} break;
 			default: {
 				TranslateMessage(&message);
@@ -334,9 +348,10 @@ static inline HWND win32_create_window(HINSTANCE instance)
 
 	// TODO: make window resolution variable
 	HWND window = CreateWindowExA(
-			0, "t3dris", "T3DRIS", WS_OVERLAPPED | WS_MINIMIZEBOX | WS_SYSMENU | WS_VISIBLE,
-			CW_USEDEFAULT, CW_USEDEFAULT, 1920, 1080,
-			0, 0, instance, 0);
+		0, "t3dris", "T3DRIS",
+		WS_OVERLAPPED | WS_MINIMIZEBOX | WS_SYSMENU | WS_VISIBLE,
+		CW_USEDEFAULT, CW_USEDEFAULT, 1920, 1080,
+		0, 0, instance, 0);
 	return window;
 }
 
@@ -348,9 +363,7 @@ int WINAPI WinMain(HINSTANCE current, HINSTANCE previous, LPSTR command, int sho
 	win32_initialize_opengl(window_dc);
 	ShowWindow(window, show_code);
 
-	GameMemory game_memory = platform_initialize_game_memory(
-			kilobytes(64),
-			megabytes(128));
+	GameMemory game_memory = platform_initialize_game_memory(kilobytes(64), megabytes(128));
 	OpenGLFunctions *gl = (OpenGLFunctions *)
 		arena_allocate(&game_memory.permanent, sizeof (OpenGLFunctions));
 	*gl = win32_load_opengl_functions();
@@ -370,7 +383,7 @@ int WINAPI WinMain(HINSTANCE current, HINSTANCE previous, LPSTR command, int sho
 
 	win32.is_running = true;
 	MSG current_message = {0};
-	// NOTE: move this to game_memory?
+	// TODO: move this to game_memory?
 	InputState input = {0};
 	while (win32.is_running) {
 		if (platform_hotload_game_has_been_compiled("game.dll", "game_load.dll")) {

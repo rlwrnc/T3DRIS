@@ -9,8 +9,6 @@ inline void arena_initialize(MemoryArena *arena, GameMemory *memory, size_t size
 inline u8 *arena_allocate(MemoryArena *arena, size_t amount);
 inline void arena_reset(MemoryArena *arena);
 
-
-
 struct MemoryArena {
         size_t size;
         u8 *base;
